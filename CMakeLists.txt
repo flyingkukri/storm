@@ -574,3 +574,11 @@ install(FILES ${CMAKE_BINARY_DIR}/stormConfigVersion.cmake DESTINATION ${CMAKE_I
 install(EXPORT storm_Targets FILE stormTargets.cmake DESTINATION ${CMAKE_INSTALL_DIR})
 
 include(StormCPackConfig.cmake)
+
+message(STATUS "project_source_dir: ${PROJECT_SOURCE_DIR}")
+message(STATUS "project_binary_dir: ${PROJECT_BINARY_DIR}")
+
+configure_file (
+	"${PROJECT_SOURCE_DIR}/storm-config.h.in"
+	"${CMAKE_BINARY_DIR}/include/storm-config.h"
+)
