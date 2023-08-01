@@ -1,6 +1,7 @@
 #pragma once
 
 #include "storm/solver/SmtSolver.h"
+#include "storm/storage/MaximalEndComponentDecomposition.h"
 
 namespace storm {
 namespace ps {
@@ -41,9 +42,36 @@ class SmtPermissiveSchedulerComputation : public PermissiveSchedulerComputation<
     SubMDPPermissiveScheduler<RM> getScheduler() const override {
         STORM_LOG_ASSERT(foundSolution(), "Solution not found.");
         SubMDPPermissiveScheduler<RM> result(this->mdp, true);
+        storm::storage::MaximalEndComponentDecomposition mecDecomp(this->mdp);
+        storm::storage::BitVector irrelevant = this->mGoals | this->mSinks;
+        storm::storage::BitVector relevantStates = ~irrelevant;
         for (auto const& entry : multistrategyVariables) {
             if (!multistrategyVariablesToTakenMap.at(entry.second)) {
                 result.disable(this->mdp.getChoiceIndex(entry.first));
+            }
+        }
+        for(auto const& mec : mecDecomp){
+            // get info about state s and action a from mec
+            auto state_set = mec.getStateSet();
+            for(auto s: state_set){
+                if(relevantStates.get(s)){
+                    auto mecChoices = mec.getChoicesForState(s);
+                    for (uint_fast64_t a = 0; a < this->mdp.getNumberOfChoices(s); ++a) {
+                        auto stateAndAction = storage::StateActionPair(s, a);
+                        auto multistrategyVariable = multistrategyVariables.at(stateAndAction);
+                        auto choiceIndex = this->mdp.getChoiceIndex(storage::StateActionPair(s, a));
+                        if(multistrategyVariablesToTakenMap.at(multistrategyVariable) && !mec.containsChoice(s,choiceIndex)){
+                            // (s,a) is in the strategy and external -> thus it is maximal-external in this mec and s is an exit
+                            for(auto mec_a : mecChoices){
+                                // disable all internal actions 
+                                // we can assume by definition of the permissive scheduler that all other maximal-external (s,a) pairs are enabled
+                                result.disable(mec_a);
+                            }
+                            break;
+                        }
+                    }
+                    // If s is not an exit we can assume that all internal actions are enabled by definition of the permissive scheduler
+                }
             }
         }
         return result;
